@@ -1,0 +1,21 @@
+[debug] [2025-10-09T05:14:20.671Z] ----------------------------------------------------------------------
+[debug] [2025-10-09T05:14:20.674Z] Command:       C:\Program Files\nodejs\node.exe C:\Users\Rashmika Bandara\AppData\Roaming\npm\node_modules\firebase-tools\lib\bin\firebase.js projects:list
+[debug] [2025-10-09T05:14:20.674Z] CLI Version:   14.19.1
+[debug] [2025-10-09T05:14:20.674Z] Platform:      win32
+[debug] [2025-10-09T05:14:20.674Z] Node Version:  v22.19.0
+[debug] [2025-10-09T05:14:20.675Z] Time:          Thu Oct 09 2025 10:44:20 GMT+0530 (India Standard Time)
+[debug] [2025-10-09T05:14:20.675Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-10-09T05:14:20.680Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-10-09T05:14:20.680Z] > authorizing via signed-in user (rashmikabandara943@gmail.com)
+[debug] [2025-10-09T05:14:20.684Z] Checked if tokens are valid: true, expires at: 1759990332215
+[debug] [2025-10-09T05:14:20.685Z] Checked if tokens are valid: true, expires at: 1759990332215
+[debug] [2025-10-09T05:14:20.686Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=1000
+[debug] [2025-10-09T05:14:27.106Z] *** [apiv2] error from fetch(https://firebase.googleapis.com/v1beta1/projects?pageSize=1000, {"headers":{},"method":"GET","signal":{}}): FetchError: request to https://firebase.googleapis.com/v1beta1/projects?pageSize=1000 failed, reason: read ECONNRESET
+[debug] [2025-10-09T05:14:27.106Z] Failed to make request to https://firebase.googleapis.com/v1beta1/projects?pageSize=1000
+[debug] [2025-10-09T05:14:32.123Z] Error: Timed out.
+    at Timeout._onTimeout (C:\Users\Rashmika Bandara\AppData\Roaming\npm\node_modules\firebase-tools\lib\utils.js:275:49)
+    at listOnTimeout (node:internal/timers:588:17)
+    at process.processTimers (node:internal/timers:523:7)
+[error] 
+[error] Error: An unexpected error has occurred.

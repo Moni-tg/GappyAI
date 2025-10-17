@@ -1,0 +1,63 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isDeviceOwner() {
+      return isAuthenticated() &&
+             request.auth.token.device_id == resource.data.device_id;
+    }
+
+    function isValidSensorData() {
+      return request.resource.data.keys().hasAll(['device_id', 'temperature', 'ph', 'oxygen', 'ammonia']) &&
+             request.resource.data.temperature is number &&
+             request.resource.data.ph is number &&
+             request.resource.data.oxygen is number &&
+             request.resource.data.ammonia is number;
+    }
+
+    // Sensor data collection - devices can write, authenticated users can read
+    match /sensor_data/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isValidSensorData();
+    }
+
+    // Device information - devices can update their own status, authenticated users can read
+    match /devices/{deviceId} {
+      allow read: if isAuthenticated();
+      allow write: if isValidSensorData() || (isAuthenticated() && request.auth.token.device_id == deviceId);
+      allow update: if isAuthenticated() || (resource.data.device_id == request.resource.data.device_id);
+    }
+
+    // Alerts - authenticated users can read and update (acknowledge)
+    match /alerts/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAuthenticated();
+      allow update: if isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['acknowledged']);
+    }
+
+    // Feeding schedule - authenticated users can manage
+    match /feeding_schedule/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+
+    // Daily summaries - authenticated users can read
+    match /daily_summaries/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if false; // Only server-side creation
+    }
+
+    // User preferences and settings
+    match /users/{userId} {
+      allow read, write: if isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Default deny rule
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
