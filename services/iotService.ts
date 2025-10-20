@@ -202,15 +202,48 @@ export class IoTService {
     return () => clearInterval(simulationInterval);
   }
 
-  // Clean up all subscriptions
-  cleanup() {
-    this.realtimeSubscriptions.forEach((unsubscribe) => {
-      if (typeof unsubscribe === 'function') {
-        unsubscribe();
-      }
-    });
-    this.realtimeSubscriptions.clear();
-    firebaseRealtime.cleanup();
+  // Control pump 1 (on/off)
+  async controlPump1(deviceId: string, isOn: boolean) {
+    try {
+      const pumpControlFunction = httpsCallable(functions, 'controlPump');
+      const result = await pumpControlFunction({
+        device_id: deviceId,
+        pump_id: 'pump_1',
+        action: isOn ? 'on' : 'off'
+      });
+      return result.data;
+    } catch (error) {
+      console.error('Error controlling pump 1:', error);
+      throw error;
+    }
+  }
+
+  // Control pump 2 (on/off)
+  async controlPump2(deviceId: string, isOn: boolean) {
+    try {
+      const pumpControlFunction = httpsCallable(functions, 'controlPump');
+      const result = await pumpControlFunction({
+        device_id: deviceId,
+        pump_id: 'pump_2',
+        action: isOn ? 'on' : 'off'
+      });
+      return result.data;
+    } catch (error) {
+      console.error('Error controlling pump 2:', error);
+      throw error;
+    }
+  }
+
+  // Get pump status
+  async getPumpStatus(deviceId: string) {
+    try {
+      const pumpStatusFunction = httpsCallable(functions, 'getPumpStatus');
+      const result = await pumpStatusFunction({ device_id: deviceId });
+      return result.data;
+    } catch (error) {
+      console.error('Error getting pump status:', error);
+      throw error;
+    }
   }
 
   // Private helper method to unsubscribe
