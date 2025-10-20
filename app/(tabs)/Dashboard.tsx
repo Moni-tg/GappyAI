@@ -1,5 +1,5 @@
 import { useRouter } from "expo-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, View } from "react-native";
 import { Button, Divider, List, Snackbar, Text, Title } from "react-native-paper";
 import GlassCard from "../../components/GlassCard";
@@ -206,7 +206,7 @@ export default function Dashboard() {
     <GradientBackground>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <HeroHeader
-          title="Skibidi toilet"
+          title="Aquarium Dashboard"
           subtitle="Overview and health snapshot"
           imageSource={require('D:/test/fih/GappyAI/app/components/tank.jpg')}
         />
