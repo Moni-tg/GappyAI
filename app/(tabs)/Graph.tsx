@@ -44,7 +44,17 @@ export default function Graph() {
     { time: '20:00', value: 0.18 },
   ];
 
-  // Chart component using react-native-chart-kit
+  // Function to calculate trend
+  const calculateTrend = (data: { time: string, value: number }[]) => {
+    if (data.length < 2) return 'stable';
+    const firstValue = data[0].value;
+    const lastValue = data[data.length - 1].value;
+    const difference = lastValue - firstValue;
+    if (difference > 0.1) return 'increasing';
+    if (difference < -0.1) return 'decreasing';
+    return 'stable';
+  };
+
   const SimpleBarChart = ({ data, title, color, unit }: { data: any[], title: string, color: string, unit: string }) => {
     const chartData = {
       labels: data.map(d => d.time),
@@ -69,6 +79,15 @@ export default function Graph() {
       }
     };
 
+    const trend = calculateTrend(data);
+    const getTrendColor = (trend: string) => {
+      switch (trend) {
+        case 'increasing': return '#4CAF50';
+        case 'decreasing': return '#FF5252';
+        default: return '#FFC107';
+      }
+    };
+
     return (
       <GlassCard style={styles.chartCard}>
         <View style={styles.chartHeader}>
@@ -87,6 +106,11 @@ export default function Graph() {
           yAxisLabel=""
           yAxisSuffix={unit}
         />
+        <View style={styles.trendContainer}>
+          <Text style={[styles.trendText, { color: getTrendColor(trend) }]}>
+            Trend: {trend.charAt(0).toUpperCase() + trend.slice(1)}
+          </Text>
+        </View>
       </GlassCard>
     );
   };
@@ -116,6 +140,15 @@ export default function Graph() {
       }
     };
 
+    const trend = calculateTrend(data);
+    const getTrendColor = (trend: string) => {
+      switch (trend) {
+        case 'increasing': return '#4CAF50';
+        case 'decreasing': return '#FF5252';
+        default: return '#FFC107';
+      }
+    };
+
     return (
       <GlassCard style={styles.chartCard}>
         <View style={styles.chartHeader}>
@@ -140,6 +173,11 @@ export default function Graph() {
           yAxisLabel=""
           yAxisSuffix={unit}
         />
+        <View style={styles.trendContainer}>
+          <Text style={[styles.trendText, { color: getTrendColor(trend) }]}>
+            Trend: {trend.charAt(0).toUpperCase() + trend.slice(1)}
+          </Text>
+        </View>
       </GlassCard>
     );
   };
@@ -236,12 +274,13 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "800",
   },
-  chartContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-around',
-    height: 120,
-    paddingVertical: 8,
+  trendContainer: {
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  trendText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   barContainer: {
     alignItems: 'center',
