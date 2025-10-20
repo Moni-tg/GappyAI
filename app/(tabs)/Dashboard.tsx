@@ -16,20 +16,17 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [snackbarVisible, setSnackbarVisible] = useState(false);
-  const [lastFeeding, setLastFeeding] = useState(new Date(Date.now() - 4 * 60 * 60 * 1000)); // 4 hours ago
-  const [nextFeeding, setNextFeeding] = useState(new Date(Date.now() + 2 * 60 * 60 * 1000)); // 2 hours from now
+  const [pump1Status, setPump1Status] = useState(false);
+  const [pump2Status, setPump2Status] = useState(false);
+  const [pumpLoading, setPumpLoading] = useState({pump1: false, pump2: false});
+  const [lastFeeding, setLastFeeding] = useState(new Date());
+  const [nextFeeding, setNextFeeding] = useState(new Date(Date.now() + 6 * 60 * 60 * 1000)); // Next feeding in 6 hours
+  const [lightBrightness, setLightBrightness] = useState(50);
+  const [lightMode, setLightMode] = useState<'manual' | 'auto'>('auto');
+  const [lightStatus, setLightStatus] = useState(false);
 
   // Default device ID - in a real app, this would come from user preferences or device selection
   const DEVICE_ID = 'aquarium_sensor_001';
-
-  useEffect(() => {
-    initializeIoTData();
-
-    // Cleanup subscriptions on unmount
-    return () => {
-      iotService.cleanup();
-    };
-  }, []);
 
   const initializeIoTData = async () => {
     try {
@@ -78,6 +75,32 @@ export default function Dashboard() {
     setNextFeeding(new Date(now.getTime() + 6 * 60 * 60 * 1000)); // Next feeding in 6 hours
   };
 
+  const handlePump1Toggle = async () => {
+    setPumpLoading(prev => ({ ...prev, pump1: true }));
+    try {
+      await iotService.controlPump1(DEVICE_ID, !pump1Status);
+      setPump1Status(!pump1Status);
+    } catch (err) {
+      console.error('Error controlling pump 1:', err);
+      setError('Failed to control pump 1');
+      setSnackbarVisible(true);
+    }
+    setPumpLoading(prev => ({ ...prev, pump1: false }));
+  };
+
+  const handlePump2Toggle = async () => {
+    setPumpLoading(prev => ({ ...prev, pump2: true }));
+    try {
+      await iotService.controlPump2(DEVICE_ID, !pump2Status);
+      setPump2Status(!pump2Status);
+    } catch (err) {
+      console.error('Error controlling pump 2:', err);
+      setError('Failed to control pump 2');
+      setSnackbarVisible(true);
+    }
+    setPumpLoading(prev => ({ ...prev, pump2: false }));
+  };
+
   const handleAcknowledgeAlert = async (alertId: string) => {
     try {
       await iotService.acknowledgeAlert(alertId);
@@ -88,6 +111,48 @@ export default function Dashboard() {
     } catch (err) {
       console.error('Error acknowledging alert:', err);
       setError('Failed to acknowledge alert');
+      setSnackbarVisible(true);
+    }
+  };
+
+  const handleLightToggle = async () => {
+    try {
+      // TODO: Implement light control in iotService
+      // await iotService.controlLight(DEVICE_ID, !lightStatus, lightBrightness);
+      setLightStatus(!lightStatus);
+      console.log(`Light ${!lightStatus ? 'ON' : 'OFF'} - Brightness: ${lightBrightness}%`);
+    } catch (err) {
+      console.error('Error controlling light:', err);
+      setError('Failed to control light');
+      setSnackbarVisible(true);
+    }
+  };
+
+  const handleLightBrightnessChange = async (value: number) => {
+    setLightBrightness(value);
+    if (lightMode === 'manual' && lightStatus) {
+      try {
+        // TODO: Implement light brightness control in iotService
+        // await iotService.controlLight(DEVICE_ID, true, value);
+        console.log(`Light brightness set to ${value}%`);
+      } catch (err) {
+        console.error('Error adjusting light brightness:', err);
+        setError('Failed to adjust light brightness');
+        setSnackbarVisible(true);
+      }
+    }
+  };
+
+  const handleLightModeToggle = async () => {
+    const newMode = lightMode === 'manual' ? 'auto' : 'manual';
+    setLightMode(newMode);
+    try {
+      // TODO: Implement light mode control in iotService
+      // await iotService.setLightMode(DEVICE_ID, newMode);
+      console.log(`Light mode changed to ${newMode}`);
+    } catch (err) {
+      console.error('Error changing light mode:', err);
+      setError('Failed to change light mode');
       setSnackbarVisible(true);
     }
   };
@@ -141,9 +206,9 @@ export default function Dashboard() {
     <GradientBackground>
       <ScrollView style={styles.container} contentContainerStyle={styles.content}>
         <HeroHeader
-          title="Your Tank"
+          title="Skibidi toilet"
           subtitle="Overview and health snapshot"
-          imageSource={require('D:/test/GappyAI/app/components/tank.jpg')}
+          imageSource={require('D:/test/fih/GappyAI/app/components/tank.jpg')}
         />
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.smallCards}>
@@ -197,6 +262,132 @@ export default function Dashboard() {
              (latestData.waterLevel || 0) >= 60 ? 'Good Level' :
              (latestData.waterLevel || 0) >= 40 ? 'Low Level' : 'Critical Level'}
           </Text>
+        </GlassCard>
+
+        {/* Pump Control - Full Width */}
+        <GlassCard style={styles.pumpControlCard}>
+          <Title style={styles.pumpControlTitle}>Pump Control</Title>
+          <Text style={styles.pumpControlSubtitle}>Manage your aquarium pumps</Text>
+
+          <View style={styles.pumpControls}>
+            <View style={styles.pumpControl}>
+              <View style={styles.pumpHeader}>
+                <Text style={styles.pumpLabel}>Pump 1</Text>
+                <View style={[styles.pumpStatus, pump1Status && styles.pumpStatusActive]}>
+                  <Text style={[styles.pumpStatusText, pump1Status && styles.pumpStatusTextActive]}>
+                    {pump1Status ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              </View>
+              <Button
+                mode="contained"
+                onPress={handlePump1Toggle}
+                style={[styles.pumpButton, pump1Status && styles.pumpButtonActive]}
+                buttonColor={pump1Status ? "#FF5252" : "#4ECDC4"}
+                textColor="#0B1B2B"
+                icon={pump1Status ? "power-off" : "power"}
+                loading={pumpLoading.pump1}
+                disabled={pumpLoading.pump1}
+              >
+                {pump1Status ? 'Turn Off' : 'Turn On'}
+              </Button>
+            </View>
+
+            <View style={styles.pumpControl}>
+              <View style={styles.pumpHeader}>
+                <Text style={styles.pumpLabel}>Pump 2</Text>
+                <View style={[styles.pumpStatus, pump2Status && styles.pumpStatusActive]}>
+                  <Text style={[styles.pumpStatusText, pump2Status && styles.pumpStatusTextActive]}>
+                    {pump2Status ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              </View>
+              <Button
+                mode="contained"
+                onPress={handlePump2Toggle}
+                style={[styles.pumpButton, pump2Status && styles.pumpButtonActive]}
+                buttonColor={pump2Status ? "#FF5252" : "#4ECDC4"}
+                textColor="#0B1B2B"
+                icon={pump2Status ? "power-off" : "power"}
+                loading={pumpLoading.pump2}
+                disabled={pumpLoading.pump2}
+              >
+                {pump2Status ? 'Turn Off' : 'Turn On'}
+              </Button>
+            </View>
+          </View>
+        </GlassCard>
+
+        {/* Light Control - Full Width */}
+        <GlassCard style={styles.lightControlCard}>
+          <Title style={styles.lightControlTitle}>Light Control</Title>
+          <Text style={styles.lightControlSubtitle}>Manage your aquarium lighting</Text>
+
+          <View style={styles.lightControls}>
+            <View style={styles.lightControl}>
+              <View style={styles.lightHeader}>
+                <Text style={styles.lightLabel}>Light</Text>
+                <View style={[styles.lightStatus, lightStatus && styles.lightStatusActive]}>
+                  <Text style={[styles.lightStatusText, lightStatus && styles.lightStatusTextActive]}>
+                    {lightStatus ? 'ON' : 'OFF'}
+                  </Text>
+                </View>
+              </View>
+              <Button
+                mode="contained"
+                onPress={handleLightToggle}
+                style={[styles.lightButton, lightStatus && styles.lightButtonActive]}
+                buttonColor={lightStatus ? "#FF5252" : "#4ECDC4"}
+                textColor="#0B1B2B"
+                icon={lightStatus ? "lightbulb-off" : "lightbulb-on"}
+              >
+                {lightStatus ? 'Turn Off' : 'Turn On'}
+              </Button>
+            </View>
+
+            <View style={styles.brightnessControl}>
+              <View style={styles.brightnessHeader}>
+                <Text style={styles.brightnessLabel}>Brightness</Text>
+                <Text style={styles.brightnessValue}>{lightBrightness}%</Text>
+              </View>
+              <View style={styles.brightnessControls}>
+                <Button
+                  mode="outlined"
+                  onPress={() => handleLightBrightnessChange(Math.max(0, lightBrightness - 10))}
+                  style={styles.brightnessButton}
+                  textColor="#4ECDC4"
+                  disabled={lightBrightness <= 0}
+                >
+                  -10
+                </Button>
+                <View style={styles.brightnessBar}>
+                  <View style={[styles.brightnessFill, { width: `${lightBrightness}%` }]} />
+                </View>
+                <Button
+                  mode="outlined"
+                  onPress={() => handleLightBrightnessChange(Math.min(100, lightBrightness + 10))}
+                  style={styles.brightnessButton}
+                  textColor="#4ECDC4"
+                  disabled={lightBrightness >= 100}
+                >
+                  +10
+                </Button>
+              </View>
+            </View>
+
+            <View style={styles.modeControl}>
+              <Text style={styles.modeLabel}>Mode</Text>
+              <Button
+                mode={lightMode === 'auto' ? 'contained' : 'outlined'}
+                onPress={handleLightModeToggle}
+                style={styles.modeButton}
+                buttonColor={lightMode === 'auto' ? "#4ECDC4" : "transparent"}
+                textColor={lightMode === 'auto' ? "#0B1B2B" : "#4ECDC4"}
+              >
+                {lightMode === 'auto' ? 'AUTO' : 'MANUAL'}
+              </Button>
+            </View>
+          </View>
         </GlassCard>
 
         <GlassCard style={styles.feedingCard}>
@@ -454,8 +645,170 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     fontWeight: '600',
   },
+  // Pump Control Styles
+  pumpControlCard: {
+    padding: 20,
+  },
+  pumpControlTitle: {
+    color: '#EAF2FF',
+    fontWeight: '700',
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  pumpControlSubtitle: {
+    color: '#C6D4EA',
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  pumpControls: {
+    gap: 16,
+  },
+  pumpControl: {
+    gap: 12,
+  },
+  pumpHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  pumpLabel: {
+    color: '#EAF2FF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  pumpStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  pumpStatusActive: {
+    backgroundColor: '#4ECDC4',
+  },
+  pumpStatusText: {
+    color: '#C6D4EA',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  pumpStatusTextActive: {
+    color: '#0B1B2B',
+  },
+  pumpButton: {
+    borderRadius: 12,
+  },
+  pumpButtonActive: {
+    borderWidth: 2,
+    borderColor: '#FF5252',
+  },
   acknowledgedAlert: {
     opacity: 0.6,
     textDecorationLine: 'line-through',
+  },
+  // Light Control Styles
+  lightControlCard: {
+    padding: 20,
+  },
+  lightControlTitle: {
+    color: '#EAF2FF',
+    fontWeight: '700',
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  lightControlSubtitle: {
+    color: '#C6D4EA',
+    fontSize: 14,
+    marginBottom: 20,
+  },
+  lightControls: {
+    gap: 16,
+  },
+  lightControl: {
+    gap: 12,
+  },
+  lightHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  lightLabel: {
+    color: '#EAF2FF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  lightStatus: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  },
+  lightStatusActive: {
+    backgroundColor: '#4ECDC4',
+  },
+  lightStatusText: {
+    color: '#C6D4EA',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  lightStatusTextActive: {
+    color: '#0B1B2B',
+  },
+  lightButton: {
+    borderRadius: 12,
+  },
+  lightButtonActive: {
+    borderWidth: 2,
+    borderColor: '#FF5252',
+  },
+  brightnessControl: {
+    gap: 12,
+  },
+  brightnessHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  brightnessLabel: {
+    color: '#EAF2FF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  brightnessValue: {
+    color: '#4ECDC4',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  brightnessControls: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  brightnessButton: {
+    borderRadius: 8,
+    minWidth: 50,
+  },
+  brightnessBar: {
+    flex: 1,
+    height: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  brightnessFill: {
+    height: '100%',
+    backgroundColor: '#4ECDC4',
+    borderRadius: 4,
+  },
+  modeControl: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  modeLabel: {
+    color: '#EAF2FF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modeButton: {
+    borderRadius: 12,
   },
 });
