@@ -208,7 +208,7 @@ export default function Dashboard() {
         <HeroHeader
           title="Aquarium Dashboard"
           subtitle="Overview and health snapshot"
-          imageSource={require('D:/test/fih/GappyAI/app/components/tank.jpg')}
+          imageSource={require('app/components/tank.jpg')}
         />
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.smallCards}>
