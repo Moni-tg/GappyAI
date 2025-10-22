@@ -11,6 +11,7 @@ export default function tabsLayout() {
   }} >
     
     <Tabs.Screen name="Dashboard" options={{headerShown: false, tabBarIcon:({color})=><MaterialIcons name="home" size={24} color={color} />}} />
+    <Tabs.Screen name="Chat" options={{headerShown: false, tabBarIcon:({color})=><MaterialIcons name="chat" size={24} color={color} />}} />
     <Tabs.Screen name="History" options={{headerShown:false, tabBarIcon:({color})=><MaterialIcons name="history" size={24} color={color}/>}}/>
     <Tabs.Screen name="Graph" options={{headerShown:false, tabBarIcon:({color})=><MaterialIcons name="bar-chart" size={24} color={color}/>}}/>
     <Tabs.Screen name="Settings" options={{headerShown:false, tabBarIcon:({color})=><MaterialIcons name="settings" size={24} color={color}/>}}/>
