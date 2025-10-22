@@ -1,6 +1,6 @@
-import React, { useState } from "react";
-import { ScrollView, StyleSheet, View, Pressable } from "react-native";
-import { Text, List, Divider, Chip, Searchbar } from "react-native-paper";
+import { useState } from "react";
+import { ScrollView, StyleSheet, View } from "react-native";
+import { Chip, Divider, Searchbar, Text } from "react-native-paper";
 import GlassCard from "../../components/GlassCard";
 import GradientBackground from "../../components/GradientBackground";
 import HeroHeader from "../../components/HeroHeader";
