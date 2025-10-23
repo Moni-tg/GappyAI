@@ -62,24 +62,6 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    },
-    "extra": {
-      "EXPO_PUBLIC_GEMINI_API_KEY": "AIzaSyDVzd3idV9N0vpRwk3L-ibYOoSlfb5X8hY",
-      "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://cloud.appwrite.io/v1",
-      "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "68d3790b0004e7bc3c99",
-      "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyANwCQJqaymJ0WVyxhysAwkxEaZte7fkOc",
-      "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "gappyai-6dde4.firebaseapp.com",
-      "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "gappyai-6dde4",
-      "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "gappyai-6dde4.firebasestorage.app",
-      "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "235636324497",
-      "EXPO_PUBLIC_FIREBASE_APP_ID": "1:235636324497:web:a44517517b74b3586c2730",
-      "EXPO_PUBLIC_IOT_DEVICE_ID": "aquarium_sensor_001",
-      "EXPO_PUBLIC_IOT_UPDATE_INTERVAL": "30000",
-      "EXPO_PUBLIC_MQTT_URL": "",
-      "EXPO_PUBLIC_MQTT_USERNAME": "",
-      "EXPO_PUBLIC_MQTT_PASSWORD": "",
-      "EXPO_PUBLIC_MQTT_CLIENT_ID": "",
-      "EXPO_PUBLIC_MQTT_TOPIC_PREFIX": ""
     }
   }
 }

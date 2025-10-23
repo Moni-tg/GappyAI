@@ -1,7 +1,6 @@
 // services/iotService.ts
-import { httpsCallable } from 'firebase/functions';
-import { collection, query, orderBy, limit, onSnapshot, where, addDoc, updateDoc, doc, getDoc, getDocs } from 'firebase/firestore';
-import { db, functions, firebaseRealtime, processIoTDataFunction, SensorData, DeviceInfo, Alert } from '../lib/firebase';
+import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { Alert, ALERTS_COLLECTION, checkAlertConditions, db, DeviceInfo, firebaseRealtime, processSensorData, SENSOR_DATA_COLLECTION, SensorData } from '../lib/firebase';
 
 export class IoTService {
   private static instance: IoTService;
@@ -19,9 +18,21 @@ export class IoTService {
   // Send IoT data to Firebase (for testing or manual entry)
   async sendSensorData(data: Omit<SensorData, 'timestamp'>) {
     try {
-      const result = await processIoTDataFunction(data);
-      console.log('Sensor data sent successfully:', result);
-      return result;
+      // Process the sensor data using client-side logic
+      const processedData = processSensorData(data);
+
+      // Save to Firestore directly
+      const docRef = await addDoc(collection(db, SENSOR_DATA_COLLECTION), processedData);
+
+      // Check for alert conditions
+      const alert = checkAlertConditions(processedData);
+      if (alert) {
+        await addDoc(collection(db, ALERTS_COLLECTION), alert);
+        console.log('Alert created:', alert);
+      }
+
+      console.log('Sensor data sent successfully:', docRef.id);
+      return { success: true, id: docRef.id };
     } catch (error) {
       console.error('Error sending sensor data:', error);
       throw error;
@@ -80,9 +91,30 @@ export class IoTService {
   // Get latest sensor data
   async getLatestSensorData(deviceId?: string, limitCount: number = 50) {
     try {
-      const getLatestData = httpsCallable(functions, 'getLatestSensorData');
-      const result = await getLatestData({ device_id: deviceId, limit: limitCount });
-      return result.data;
+      let q;
+      if (deviceId) {
+        q = query(
+          collection(db, SENSOR_DATA_COLLECTION),
+          where('device_id', '==', deviceId),
+          orderBy('timestamp', 'desc'),
+          limit(limitCount)
+        );
+      } else {
+        q = query(
+          collection(db, SENSOR_DATA_COLLECTION),
+          orderBy('timestamp', 'desc'),
+          limit(limitCount)
+        );
+      }
+
+      const snapshot = await getDocs(q);
+      const data: SensorData[] = [];
+
+      snapshot.forEach((doc: any) => {
+        data.push(doc.data() as SensorData);
+      });
+
+      return data;
     } catch (error) {
       console.error('Error getting latest sensor data:', error);
       throw error;
@@ -92,9 +124,15 @@ export class IoTService {
   // Register a new IoT device
   async registerDevice(deviceInfo: { device_id: string; name: string; type: string }) {
     try {
-      const registerDeviceFunction = httpsCallable(functions, 'registerDevice');
-      const result = await registerDeviceFunction(deviceInfo);
-      return result.data;
+      const deviceData = {
+        ...deviceInfo,
+        is_active: true,
+        last_seen: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(collection(db, 'devices'), deviceData);
+      console.log('Device registered successfully:', docRef.id);
+      return { success: true, id: docRef.id };
     } catch (error) {
       console.error('Error registering device:', error);
       throw error;
@@ -205,13 +243,16 @@ export class IoTService {
   // Control pump 1 (on/off)
   async controlPump1(deviceId: string, isOn: boolean) {
     try {
-      const pumpControlFunction = httpsCallable(functions, 'controlPump');
-      const result = await pumpControlFunction({
+      const commandData = {
         device_id: deviceId,
         pump_id: 'pump_1',
-        action: isOn ? 'on' : 'off'
-      });
-      return result.data;
+        action: isOn ? 'on' : 'off',
+        timestamp: serverTimestamp(),
+      };
+
+      await addDoc(collection(db, 'device_commands'), commandData);
+      console.log(`Pump 1 ${isOn ? 'turned on' : 'turned off'} for device ${deviceId}`);
+      return { success: true };
     } catch (error) {
       console.error('Error controlling pump 1:', error);
       throw error;
@@ -221,13 +262,16 @@ export class IoTService {
   // Control pump 2 (on/off)
   async controlPump2(deviceId: string, isOn: boolean) {
     try {
-      const pumpControlFunction = httpsCallable(functions, 'controlPump');
-      const result = await pumpControlFunction({
+      const commandData = {
         device_id: deviceId,
         pump_id: 'pump_2',
-        action: isOn ? 'on' : 'off'
-      });
-      return result.data;
+        action: isOn ? 'on' : 'off',
+        timestamp: serverTimestamp(),
+      };
+
+      await addDoc(collection(db, 'device_commands'), commandData);
+      console.log(`Pump 2 ${isOn ? 'turned on' : 'turned off'} for device ${deviceId}`);
+      return { success: true };
     } catch (error) {
       console.error('Error controlling pump 2:', error);
       throw error;
@@ -237,9 +281,29 @@ export class IoTService {
   // Get pump status
   async getPumpStatus(deviceId: string) {
     try {
-      const pumpStatusFunction = httpsCallable(functions, 'getPumpStatus');
-      const result = await pumpStatusFunction({ device_id: deviceId });
-      return result.data;
+      const q = query(
+        collection(db, 'device_commands'),
+        where('device_id', '==', deviceId),
+        orderBy('timestamp', 'desc'),
+        limit(10)
+      );
+
+      const snapshot = await getDocs(q);
+      const commands: any[] = [];
+
+      snapshot.forEach((doc: any) => {
+        commands.push(doc.data());
+      });
+
+      // Return the latest command for each pump
+      const latestCommands: { [key: string]: any } = {};
+      commands.forEach(cmd => {
+        if (!latestCommands[cmd.pump_id] || cmd.timestamp > latestCommands[cmd.pump_id].timestamp) {
+          latestCommands[cmd.pump_id] = cmd;
+        }
+      });
+
+      return latestCommands;
     } catch (error) {
       console.error('Error getting pump status:', error);
       throw error;

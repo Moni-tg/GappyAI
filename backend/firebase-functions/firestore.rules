@@ -12,11 +12,17 @@ service cloud.firestore {
     }
 
     function isValidSensorData() {
-      return request.resource.data.keys().hasAll(['device_id', 'temperature', 'ph', 'oxygen', 'ammonia']) &&
+      return request.resource.data.keys().hasAll(['device_id', 'temperature', 'ph', 'turbidity', 'ammonia']) &&
              request.resource.data.temperature is number &&
              request.resource.data.ph is number &&
-             request.resource.data.oxygen is number &&
+             request.resource.data.turbidity is number &&
              request.resource.data.ammonia is number;
+    }
+
+    function isValidDeviceCommand() {
+      return request.resource.data.keys().hasAll(['device_id', 'action', 'timestamp']) &&
+             request.resource.data.device_id is string &&
+             request.resource.data.action is string;
     }
 
     // Sensor data collection - devices can write, authenticated users can read
@@ -37,6 +43,12 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow write: if isAuthenticated();
       allow update: if isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['acknowledged']);
+    }
+
+    // Device commands - authenticated users can write, devices can read their own commands
+    match /device_commands/{document=**} {
+      allow read: if isAuthenticated() || (isDeviceOwner() && resource.data.device_id == request.auth.token.device_id);
+      allow write: if isAuthenticated() && isValidDeviceCommand();
     }
 
     // Feeding schedule - authenticated users can manage

@@ -1,8 +1,7 @@
 // lib/firebase.ts
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot, serverTimestamp } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { addDoc, collection, getFirestore, limit, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -20,7 +19,6 @@ const app = initializeApp(firebaseConfig);
 // Initialize Firebase services
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-export const functions = getFunctions(app);
 
 // Collection references
 export const SENSOR_DATA_COLLECTION = 'sensor_data';
@@ -190,9 +188,6 @@ export class FirebaseRealtimeService {
 
 // Export singleton instance
 export const firebaseRealtime = new FirebaseRealtimeService();
-
-// Firebase Cloud Function for IoT data processing
-export const processIoTDataFunction = httpsCallable(functions, 'processIoTData');
 
 // Helper functions for data processing
 export const processSensorData = (rawData: any): SensorData => {
