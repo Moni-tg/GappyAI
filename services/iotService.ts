@@ -1,6 +1,6 @@
 // services/iotService.ts
-import { collection, query, orderBy, limit, onSnapshot, where, addDoc, updateDoc, doc, getDoc, getDocs, serverTimestamp } from 'firebase/firestore';
-import { db, firebaseRealtime, processSensorData, checkAlertConditions, SensorData, DeviceInfo, Alert, SENSOR_DATA_COLLECTION, ALERTS_COLLECTION } from '../lib/firebase';
+import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
+import { Alert, ALERTS_COLLECTION, checkAlertConditions, db, DeviceInfo, firebaseRealtime, processSensorData, SENSOR_DATA_COLLECTION, SensorData } from '../lib/firebase';
 
 export class IoTService {
   private static instance: IoTService;
