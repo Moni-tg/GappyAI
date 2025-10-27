@@ -1,4 +1,4 @@
-import { Image, ImageSourcePropType, StyleSheet, Text, View } from "react-native";
+import { Image, ImageSourcePropType, StyleSheet, Text, View, Pressable } from "react-native";
 import GlassCard from "./GlassCard";
 
 interface HeroHeaderProps {
@@ -6,9 +6,11 @@ interface HeroHeaderProps {
   subtitle?: string;
   imageSource?: ImageSourcePropType;
   showDots?: boolean;
+  onImageSelect?: () => void;
+  showImageSelector?: boolean;
 }
 
-export default function HeroHeader({ title, subtitle, imageSource, showDots = false }: HeroHeaderProps) {
+export default function HeroHeader({ title, subtitle, imageSource, showDots = false, onImageSelect, showImageSelector = false }: HeroHeaderProps) {
   return (
     <View style={styles.container}>
       <View style={styles.heroLayer}>
@@ -16,6 +18,12 @@ export default function HeroHeader({ title, subtitle, imageSource, showDots = fa
           <Image source={imageSource} resizeMode="cover" style={styles.heroImage} />
         ) : (
           <View style={styles.placeholderCircle} />
+        )}
+
+        {showImageSelector && (
+          <Pressable style={styles.imageSelector} onPress={onImageSelect}>
+            <Text style={styles.selectorText}>📷</Text>
+          </Pressable>
         )}
       </View>
 
@@ -92,5 +100,23 @@ const styles = StyleSheet.create({
   },
   dotActive: {
     backgroundColor: "#76D9DB",
+  },
+  imageSelector: {
+    position: "absolute",
+    bottom: 15,
+    right: 15,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.4)",
+    elevation: 5,
+  },
+  selectorText: {
+    fontSize: 22,
+    color: "#EAF2FF",
   },
 });

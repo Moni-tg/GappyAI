@@ -60,7 +60,7 @@ const styles = StyleSheet.create({
   },
   value: {
     color: "#EAF2FF",
-    fontSize: 28,
+    fontSize: 20,
     fontWeight: "800",
   },
   unit: {

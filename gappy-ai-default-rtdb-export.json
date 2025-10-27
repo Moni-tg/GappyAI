@@ -1,0 +1,30 @@
+{
+  "controls": {
+    "autoFeedEnabled": true,
+    "feedNow": false,
+    "lampBrightness": 100,
+    "pump1": false,
+    "pump2": false
+  },
+  "feeder": {
+    "autoFeedEnabled": true,
+    "feedCount": 0,
+    "nextFeed": "9h 39m"
+  },
+  "lastUpdate": 1761490412493,
+  "outputs": {
+    "lampBrightness": 100,
+    "pump1": false,
+    "pump2": false
+  },
+  "sensors": {
+    "ammonia": 5,
+    "foodEmpty": true,
+    "ph": 4.94879,
+    "temperature": 25,
+    "turbidity": 200,
+    "uv": 970,
+    "waterLevel": 0,
+    "waterLevelCm": 0
+  }
+}
