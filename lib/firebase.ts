@@ -1,12 +1,13 @@
 // lib/firebase.ts
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { addDoc, collection, getFirestore, limit, onSnapshot, orderBy, query, serverTimestamp } from 'firebase/firestore';
+import { getDatabase, ref, onValue, set, update, push, remove, get } from 'firebase/database';
 
 // Firebase configuration
 const firebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.EXPO_PUBLIC_FIREBASE_DATABASE_URL,
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
   storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
@@ -14,167 +15,214 @@ const firebaseConfig = {
 };
 
 // Initialize Firebase
-const app = initializeApp(firebaseConfig);
+let app;
+try {
+  app = initializeApp(firebaseConfig);
+  console.log('🔥 Firebase app initialized:', app.name);
+  console.log('🌐 Database URL:', firebaseConfig.databaseURL);
+} catch (error) {
+  console.error('❌ Error initializing Firebase:', error);
+  // Create a mock Firebase setup for development when env vars are missing
+  console.warn('⚠️ Using mock Firebase configuration for development');
+  app = initializeApp({
+    apiKey: "demo-key",
+    authDomain: "demo.firebaseapp.com",
+    databaseURL: "https://demo.firebaseio.com",
+    projectId: "demo",
+    storageBucket: "demo.appspot.com",
+    messagingSenderId: "123456789",
+    appId: "1:123456789:web:demo"
+  });
+}
 
 // Initialize Firebase services
-export const db = getFirestore(app);
+export const db = getDatabase(app);
 export const auth = getAuth(app);
 
-// Collection references
-export const SENSOR_DATA_COLLECTION = 'sensor_data';
-export const DEVICES_COLLECTION = 'devices';
-export const ALERTS_COLLECTION = 'alerts';
-export const FEEDING_SCHEDULE_COLLECTION = 'feeding_schedule';
+console.log('🗄️ Database reference created');
+console.log('🔐 Auth reference created');
 
-// Types for IoT data
-export interface SensorData {
-  device_id: string;
-  temperature: number;
-  ph: number;
-  turbidity: number;
+// Realtime Database paths - Data is at root level
+export const CONTROLS_PATH = ''; // Empty since controls are at root
+export const FEEDER_PATH = '';   // Empty since feeder data is at root
+export const SENSORS_PATH = ''; // Empty since sensors are at root
+export const OUTPUTS_PATH = ''; // Empty since outputs are at root
+export const LAST_UPDATE_PATH = ''; // Empty since lastUpdate is at root
+
+// Types for IoT data based on your database structure
+export interface ControlsData {
+  autoFeedEnabled: boolean;
+  feedNow: boolean;
+  lampBrightness: number;
+  pump1: boolean;
+  pump2: boolean;
+}
+
+export interface FeederData {
+  autoFeedEnabled: boolean;
+  feedCount: number;
+  nextFeed: string;
+}
+
+export interface SensorsData {
   ammonia: number;
-  waterLevel?: number;  // Added water level percentage
-  timestamp: any; // Firestore timestamp
-  location?: string;
+  foodEmpty: boolean;
+  ph: number;
+  temperature: number;
+  turbidity: number;
+  uv: number;
+  waterLevel: number;
+  waterLevelCm: number;
 }
 
-export interface DeviceInfo {
-  device_id: string;
-  name: string;
-  type: 'aquarium_sensor' | 'feeder' | 'light_controller';
-  is_active: boolean;
-  last_seen: any;
-  location?: string;
+export interface OutputsData {
+  lampBrightness: number;
+  pump1: boolean;
+  pump2: boolean;
 }
 
-export interface Alert {
-  device_id: string;
-  type: 'temperature' | 'ph' | 'turbidity' | 'ammonia' | 'system';
-  severity: 'low' | 'medium' | 'high' | 'critical';
-  message: string;
-  timestamp: any;
-  acknowledged: boolean;
+export interface RealtimeData {
+  controls: ControlsData;
+  feeder: FeederData;
+  lastUpdate: number;
+  outputs: OutputsData;
+  sensors: SensorsData;
 }
 
-// Real-time sensor data listener
+// Real-time database service class
 export class FirebaseRealtimeService {
   private unsubscribeFunctions: (() => void)[] = [];
 
-  // Subscribe to real-time sensor data updates
-  subscribeToSensorData(
-    deviceId: string,
-    callback: (data: SensorData[]) => void,
-    maxResults: number = 50
-  ) {
-    const q = query(
-      collection(db, SENSOR_DATA_COLLECTION),
-      orderBy('timestamp', 'desc'),
-      limit(maxResults)
-    );
+  // Subscribe to real-time updates for the entire device data
+  subscribeToDeviceData(deviceId: string, callback: (data: RealtimeData) => void) {
+    const deviceRef = ref(db); // Root level, no device ID
 
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const sensorData: SensorData[] = [];
-      querySnapshot.forEach((doc: any) => {
-        const data = doc.data() as SensorData;
-        if (data.device_id === deviceId) {
-          sensorData.push(data);
-        }
-      });
-      callback(sensorData);
+    console.log('🔄 Setting up realtime subscription for device:', deviceId);
+    console.log('📍 Database path:', deviceRef.toString());
+
+    const unsubscribe = onValue(deviceRef, (snapshot) => {
+      const data = snapshot.val() as RealtimeData;
+      console.log('📡 Firebase snapshot received:', data);
+
+      if (data) {
+        console.log('✅ Valid data received, calling callback');
+        callback(data);
+      } else {
+        console.log('⚠️ No data available at path:', deviceRef.toString());
+      }
+    }, (error) => {
+      console.error('❌ Error subscribing to device data:', error);
     });
 
     this.unsubscribeFunctions.push(unsubscribe);
     return unsubscribe;
   }
 
-  // Subscribe to device status updates
-  subscribeToDeviceStatus(
-    deviceId: string,
-    callback: (device: DeviceInfo) => void
-  ) {
-    const unsubscribe = onSnapshot(
-      collection(db, DEVICES_COLLECTION),
-      (querySnapshot) => {
-        querySnapshot.forEach((doc: any) => {
-          const device = doc.data() as DeviceInfo;
-          if (device.device_id === deviceId) {
-            callback(device);
+  // Subscribe to specific sensor data
+  subscribeToSensors(deviceId: string, callback: (sensors: SensorsData) => void) {
+    const sensorsRef = ref(db); // Root level, no device ID
+
+    const unsubscribe = onValue(sensorsRef, (snapshot) => {
+      const data = snapshot.val() as RealtimeData;
+      if (data && data.sensors) {
+        callback(data.sensors);
+      }
+    }, (error) => {
+      console.error('Error subscribing to sensors:', error);
+    });
+
+    this.unsubscribeFunctions.push(unsubscribe);
+    return unsubscribe;
+  }
+
+  // Subscribe to controls
+  subscribeToControls(deviceId: string, callback: (controls: ControlsData) => void) {
+    const controlsRef = ref(db); // Root level, no device ID
+
+    const unsubscribe = onValue(controlsRef, (snapshot) => {
+      const data = snapshot.val() as RealtimeData;
+      if (data && data.controls) {
+        callback(data.controls);
+      }
+    }, (error) => {
+      console.error('Error subscribing to controls:', error);
+    });
+
+    this.unsubscribeFunctions.push(unsubscribe);
+    return unsubscribe;
+  }
+
+  // Trigger feed now
+  async triggerFeed(deviceId: string) {
+    try {
+      // First read current controls to preserve other values
+      const deviceRef = ref(db); // Root level, no device ID
+      const snapshot = await get(deviceRef);
+      const currentData = snapshot.val() as RealtimeData;
+
+      if (currentData && currentData.controls) {
+        await update(deviceRef, {
+          controls: {
+            ...currentData.controls,
+            feedNow: true
           }
         });
+        console.log('Feed triggered successfully');
+      } else {
+        console.error('No existing controls data found');
       }
-    );
-
-    this.unsubscribeFunctions.push(unsubscribe);
-    return unsubscribe;
-  }
-
-  // Subscribe to alerts
-  subscribeToAlerts(
-    deviceId: string,
-    callback: (alerts: Alert[]) => void
-  ) {
-    const q = query(
-      collection(db, ALERTS_COLLECTION),
-      orderBy('timestamp', 'desc'),
-      limit(20)
-    );
-
-    const unsubscribe = onSnapshot(q, (querySnapshot) => {
-      const alerts: Alert[] = [];
-      querySnapshot.forEach((doc: any) => {
-        const alert = doc.data() as Alert;
-        if (alert.device_id === deviceId) {
-          alerts.push(alert);
-        }
-      });
-      callback(alerts);
-    });
-
-    this.unsubscribeFunctions.push(unsubscribe);
-    return unsubscribe;
-  }
-
-  // Add new sensor data
-  async addSensorData(data: Omit<SensorData, 'timestamp'>) {
-    try {
-      const docRef = await addDoc(collection(db, SENSOR_DATA_COLLECTION), {
-        ...data,
-        timestamp: serverTimestamp(),
-      });
-      return docRef.id;
     } catch (error) {
-      console.error('Error adding sensor data:', error);
+      console.error('Error triggering feed:', error);
       throw error;
     }
   }
 
-  // Update device status
-  async updateDeviceStatus(deviceId: string, isActive: boolean) {
+  // Update lamp brightness
+  async updateLampBrightness(deviceId: string, brightness: number) {
     try {
-      // This would typically update a specific device document
-      // Implementation depends on your device management strategy
-      console.log(`Device ${deviceId} status updated: ${isActive}`);
+      // First read current controls to preserve other values
+      const deviceRef = ref(db); // Root level, no device ID
+      const snapshot = await get(deviceRef);
+      const currentData = snapshot.val() as RealtimeData;
+
+      if (currentData && currentData.controls) {
+        await update(deviceRef, {
+          controls: {
+            ...currentData.controls,
+            lampBrightness: brightness
+          }
+        });
+        console.log(`Lamp brightness updated to ${brightness}% successfully`);
+      } else {
+        console.error('No existing controls data found');
+      }
     } catch (error) {
-      console.error('Error updating device status:', error);
+      console.error('Error updating lamp brightness:', error);
       throw error;
     }
   }
 
-  // Generate alert
-  async createAlert(alert: Omit<Alert, 'timestamp'>) {
+  // Toggle pump
+  async togglePump(deviceId: string, pump: 'pump1' | 'pump2', state: boolean) {
     try {
-      const docRef = await addDoc(collection(db, ALERTS_COLLECTION), {
-        ...alert,
-        timestamp: serverTimestamp(),
-        acknowledged: false,
-      });
+      // First read current controls to preserve other values
+      const deviceRef = ref(db); // Root level, no device ID
+      const snapshot = await get(deviceRef);
+      const currentData = snapshot.val() as RealtimeData;
 
-      // Note: Push notifications are now handled locally via expo-notifications
-      // The notificationService.sendAlertNotification() call has been removed
-
-      return docRef.id;
+      if (currentData && currentData.controls) {
+        await update(deviceRef, {
+          controls: {
+            ...currentData.controls,
+            [pump]: state
+          }
+        });
+        console.log(`Pump ${pump} ${state ? 'turned on' : 'turned off'} successfully`);
+      } else {
+        console.error('No existing controls data found');
+      }
     } catch (error) {
-      console.error('Error creating alert:', error);
+      console.error(`Error toggling pump ${pump}:`, error);
       throw error;
     }
   }
@@ -184,70 +232,105 @@ export class FirebaseRealtimeService {
     this.unsubscribeFunctions.forEach(unsubscribe => unsubscribe());
     this.unsubscribeFunctions = [];
   }
+
+  // Populate database with test data for development
+  async populateWithTestData(deviceId: string) {
+    try {
+      console.log('🧪 [DEV MODE] Populating database with test data...');
+      const deviceRef = ref(db); // Root level, no device ID
+
+      const testData: RealtimeData = {
+        sensors: {
+          temperature: 25,
+          ph: 4.95,
+          turbidity: 200,
+          ammonia: 5,
+          uv: 970,
+          waterLevel: 0,
+          waterLevelCm: 0,
+          foodEmpty: true
+        },
+        controls: {
+          autoFeedEnabled: true,
+          feedNow: false,
+          lampBrightness: 100,
+          pump1: false,
+          pump2: false
+        },
+        feeder: {
+          autoFeedEnabled: true,
+          feedCount: 0,
+          nextFeed: '9h 39m'
+        },
+        outputs: {
+          lampBrightness: 100,
+          pump1: false,
+          pump2: false
+        },
+        lastUpdate: Date.now()
+      };
+
+      await set(deviceRef, testData);
+      console.log('✅ Test data populated successfully');
+      return testData;
+    } catch (error) {
+      console.error('❌ Error populating test data:', error);
+      throw error;
+    }
+  }
 }
 
 // Export singleton instance
 export const firebaseRealtime = new FirebaseRealtimeService();
 
 // Helper functions for data processing
-export const processSensorData = (rawData: any): SensorData => {
+export const processSensorData = (rawData: SensorsData) => {
   return {
-    device_id: rawData.device_id,
-    temperature: parseFloat(rawData.temperature),
-    ph: parseFloat(rawData.ph),
-    turbidity: parseFloat(rawData.turbidity),
-    ammonia: parseFloat(rawData.ammonia),
-    timestamp: serverTimestamp(),
-    location: rawData.location,
+    ammonia: parseFloat(rawData.ammonia.toString()),
+    foodEmpty: Boolean(rawData.foodEmpty),
+    ph: parseFloat(rawData.ph.toString()),
+    temperature: parseFloat(rawData.temperature.toString()),
+    turbidity: parseFloat(rawData.turbidity.toString()),
+    uv: parseFloat(rawData.uv.toString()),
+    waterLevel: parseFloat(rawData.waterLevel.toString()),
+    waterLevelCm: parseFloat(rawData.waterLevelCm.toString()),
   };
 };
 
-export const checkAlertConditions = (data: SensorData): Alert | null => {
+export const checkAlertConditions = (sensors: SensorsData): { type: string; severity: string; message: string } | null => {
   // Temperature alert
-  if (data.temperature < 20 || data.temperature > 30) {
+  if (sensors.temperature < 20 || sensors.temperature > 30) {
     return {
-      device_id: data.device_id,
       type: 'temperature',
-      severity: data.temperature < 18 || data.temperature > 32 ? 'critical' : 'high',
-      message: `Temperature ${data.temperature}°C is outside normal range (20-30°C)`,
-      timestamp: serverTimestamp(),
-      acknowledged: false,
+      severity: sensors.temperature < 18 || sensors.temperature > 32 ? 'critical' : 'high',
+      message: `Temperature ${sensors.temperature}°C is outside normal range (20-30°C)`
     };
   }
 
   // pH alert
-  if (data.ph < 6.0 || data.ph > 8.0) {
+  if (sensors.ph < 6.0 || sensors.ph > 8.0) {
     return {
-      device_id: data.device_id,
       type: 'ph',
-      severity: data.ph < 5.5 || data.ph > 8.5 ? 'critical' : 'high',
-      message: `pH level ${data.ph} is outside normal range (6.0-8.0)`,
-      timestamp: serverTimestamp(),
-      acknowledged: false,
+      severity: sensors.ph < 5.5 || sensors.ph > 8.5 ? 'critical' : 'high',
+      message: `pH level ${sensors.ph} is outside normal range (6.0-8.0)`
     };
   }
 
   // Turbidity alert
-  if (data.turbidity > 10.0) {
+  if (sensors.turbidity > 10.0) {
     return {
-      device_id: data.device_id,
       type: 'turbidity',
-      severity: data.turbidity > 15.0 ? 'critical' : 'medium',
-      message: `Turbidity level ${data.turbidity} NTU is above normal (10.0 NTU)`,
-      timestamp: serverTimestamp(),
-      acknowledged: false,
+      severity: sensors.turbidity > 15.0 ? 'critical' : 'medium',
+      message: `Turbidity level ${sensors.turbidity} NTU is above normal (10.0 NTU)`
     };
   }
 
   // Ammonia alert
-  if (data.ammonia > 0.5) {
+  if (sensors.ammonia > 0.5) {
     return {
-      device_id: data.device_id,
       type: 'ammonia',
-      severity: data.ammonia > 1.0 ? 'critical' : 'medium',
-      message: `Ammonia level ${data.ammonia} ppm is above normal (0.5 ppm)`,
-      timestamp: serverTimestamp(),
-      acknowledged: false,
+      severity: sensors.ammonia > 1.0 ? 'critical' : 'medium',
+      message: `Ammonia level ${sensors.ammonia} ppm is above normal (0.5 ppm)`
     };
   }
 

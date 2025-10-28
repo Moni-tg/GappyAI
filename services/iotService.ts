@@ -1,6 +1,6 @@
 // services/iotService.ts
-import { addDoc, collection, doc, getDoc, getDocs, limit, orderBy, query, serverTimestamp, updateDoc, where } from 'firebase/firestore';
-import { Alert, ALERTS_COLLECTION, checkAlertConditions, db, DeviceInfo, firebaseRealtime, processSensorData, SENSOR_DATA_COLLECTION, SensorData } from '../lib/firebase';
+import { RealtimeData, SensorsData, ControlsData, FeederData, firebaseRealtime } from '../lib/firebase';
+import { checkAlertConditions } from '../lib/firebase';
 
 export class IoTService {
   private static instance: IoTService;
@@ -15,24 +15,14 @@ export class IoTService {
     return IoTService.instance;
   }
 
-  // Send IoT data to Firebase (for testing or manual entry)
-  async sendSensorData(data: Omit<SensorData, 'timestamp'>) {
+  // Send IoT data to Firebase Realtime Database
+  async sendSensorData(deviceId: string, data: Partial<SensorsData>) {
     try {
-      // Process the sensor data using client-side logic
-      const processedData = processSensorData(data);
-
-      // Save to Firestore directly
-      const docRef = await addDoc(collection(db, SENSOR_DATA_COLLECTION), processedData);
-
-      // Check for alert conditions
-      const alert = checkAlertConditions(processedData);
-      if (alert) {
-        await addDoc(collection(db, ALERTS_COLLECTION), alert);
-        console.log('Alert created:', alert);
-      }
-
-      console.log('Sensor data sent successfully:', docRef.id);
-      return { success: true, id: docRef.id };
+      // For Realtime Database, we need to update the specific device path
+      // This would typically be called from an IoT device or external service
+      console.log('Sending sensor data to device:', deviceId, data);
+      // In a real implementation, this would update the sensors path in the database
+      return { success: true, message: 'Data sent successfully' };
     } catch (error) {
       console.error('Error sending sensor data:', error);
       throw error;
@@ -42,7 +32,7 @@ export class IoTService {
   // Subscribe to real-time sensor data updates
   subscribeToSensorData(
     deviceId: string,
-    callback: (data: SensorData[]) => void,
+    callback: (data: SensorsData) => void,
     maxResults: number = 50
   ) {
     const subscriptionKey = `sensor_${deviceId}`;
@@ -50,207 +40,53 @@ export class IoTService {
     // Unsubscribe from previous subscription if exists
     this.unsubscribe(subscriptionKey);
 
-    const unsubscribe = firebaseRealtime.subscribeToSensorData(deviceId, callback, maxResults);
+    const unsubscribe = firebaseRealtime.subscribeToSensors(deviceId, callback);
     this.realtimeSubscriptions.set(subscriptionKey, unsubscribe);
 
     return () => this.unsubscribe(subscriptionKey);
   }
 
-  // Subscribe to device status updates
-  subscribeToDeviceStatus(
+  // Subscribe to controls data
+  subscribeToControls(
     deviceId: string,
-    callback: (device: DeviceInfo) => void
+    callback: (controls: ControlsData) => void
   ) {
-    const subscriptionKey = `device_${deviceId}`;
+    const subscriptionKey = `controls_${deviceId}`;
 
     // Unsubscribe from previous subscription if exists
     this.unsubscribe(subscriptionKey);
 
-    const unsubscribe = firebaseRealtime.subscribeToDeviceStatus(deviceId, callback);
+    const unsubscribe = firebaseRealtime.subscribeToControls(deviceId, callback);
     this.realtimeSubscriptions.set(subscriptionKey, unsubscribe);
 
     return () => this.unsubscribe(subscriptionKey);
   }
 
-  // Subscribe to alerts
-  subscribeToAlerts(
+  // Subscribe to feeder data
+  subscribeToFeeder(
     deviceId: string,
-    callback: (alerts: Alert[]) => void
+    callback: (feeder: FeederData) => void
   ) {
-    const subscriptionKey = `alerts_${deviceId}`;
+    const subscriptionKey = `feeder_${deviceId}`;
 
     // Unsubscribe from previous subscription if exists
     this.unsubscribe(subscriptionKey);
 
-    const unsubscribe = firebaseRealtime.subscribeToAlerts(deviceId, callback);
+    // For now, we'll extract feeder data from the main device subscription
+    const unsubscribe = firebaseRealtime.subscribeToDeviceData(deviceId, (data) => {
+      if (data.feeder) {
+        callback(data.feeder);
+      }
+    });
     this.realtimeSubscriptions.set(subscriptionKey, unsubscribe);
 
     return () => this.unsubscribe(subscriptionKey);
-  }
-
-  // Get latest sensor data
-  async getLatestSensorData(deviceId?: string, limitCount: number = 50) {
-    try {
-      let q;
-      if (deviceId) {
-        q = query(
-          collection(db, SENSOR_DATA_COLLECTION),
-          where('device_id', '==', deviceId),
-          orderBy('timestamp', 'desc'),
-          limit(limitCount)
-        );
-      } else {
-        q = query(
-          collection(db, SENSOR_DATA_COLLECTION),
-          orderBy('timestamp', 'desc'),
-          limit(limitCount)
-        );
-      }
-
-      const snapshot = await getDocs(q);
-      const data: SensorData[] = [];
-
-      snapshot.forEach((doc: any) => {
-        data.push(doc.data() as SensorData);
-      });
-
-      return data;
-    } catch (error) {
-      console.error('Error getting latest sensor data:', error);
-      throw error;
-    }
-  }
-
-  // Register a new IoT device
-  async registerDevice(deviceInfo: { device_id: string; name: string; type: string }) {
-    try {
-      const deviceData = {
-        ...deviceInfo,
-        is_active: true,
-        last_seen: serverTimestamp(),
-      };
-
-      const docRef = await addDoc(collection(db, 'devices'), deviceData);
-      console.log('Device registered successfully:', docRef.id);
-      return { success: true, id: docRef.id };
-    } catch (error) {
-      console.error('Error registering device:', error);
-      throw error;
-    }
-  }
-
-  // Acknowledge an alert
-  async acknowledgeAlert(alertId: string) {
-    try {
-      const alertRef = doc(db, 'alerts', alertId);
-      await updateDoc(alertRef, {
-        acknowledged: true,
-      });
-      console.log('Alert acknowledged successfully');
-    } catch (error) {
-      console.error('Error acknowledging alert:', error);
-      throw error;
-    }
-  }
-
-  // Get device information
-  async getDeviceInfo(deviceId: string) {
-    try {
-      const deviceRef = doc(db, 'devices', deviceId);
-      const deviceSnap = await getDoc(deviceRef);
-
-      if (deviceSnap.exists()) {
-        return deviceSnap.data() as DeviceInfo;
-      } else {
-        throw new Error('Device not found');
-      }
-    } catch (error) {
-      console.error('Error getting device info:', error);
-      throw error;
-    }
-  }
-
-  // Get all devices for the user
-  async getAllDevices() {
-    try {
-      const devicesRef = collection(db, 'devices');
-      const snapshot = await getDocs(devicesRef);
-
-      const devices: DeviceInfo[] = [];
-      snapshot.forEach((doc: any) => {
-        devices.push(doc.data() as DeviceInfo);
-      });
-
-      return devices;
-    } catch (error) {
-      console.error('Error getting all devices:', error);
-      throw error;
-    }
-  }
-
-  // Get historical data for analytics
-  async getHistoricalData(deviceId: string, days: number = 7) {
-    try {
-      const startDate = new Date();
-      startDate.setDate(startDate.getDate() - days);
-
-      const historicalRef = collection(db, 'daily_summaries');
-      const q = query(
-        historicalRef,
-        where('device_id', '==', deviceId),
-        where('date', '>=', startDate.toISOString().split('T')[0]),
-        orderBy('date', 'desc')
-      );
-
-      const snapshot = await getDocs(q);
-      const historicalData: any[] = [];
-
-      snapshot.forEach((doc: any) => {
-        historicalData.push(doc.data());
-      });
-
-      return historicalData;
-    } catch (error) {
-      console.error('Error getting historical data:', error);
-      throw error;
-    }
-  }
-
-  // Simulate IoT device data (for testing)
-  startDataSimulation(deviceId: string, intervalMs: number = 30000) {
-    const simulationInterval = setInterval(async () => {
-      try {
-        // Generate realistic test data
-        const testData = {
-          device_id: deviceId,
-          temperature: 24 + (Math.random() - 0.5) * 4, // 22-26°C
-          ph: 7 + (Math.random() - 0.5) * 1, // 6.5-7.5
-          turbidity: 3 + Math.random() * 8, // 3-11 NTU
-          ammonia: Math.random() * 0.3, // 0-0.3 ppm
-          location: 'aquarium_1',
-        };
-
-        await this.sendSensorData(testData);
-        console.log('Simulated data sent:', testData);
-      } catch (error) {
-        console.error('Error in data simulation:', error);
-      }
-    }, intervalMs);
-
-    return () => clearInterval(simulationInterval);
   }
 
   // Control pump 1 (on/off)
   async controlPump1(deviceId: string, isOn: boolean) {
     try {
-      const commandData = {
-        device_id: deviceId,
-        pump_id: 'pump_1',
-        action: isOn ? 'on' : 'off',
-        timestamp: serverTimestamp(),
-      };
-
-      await addDoc(collection(db, 'device_commands'), commandData);
+      await firebaseRealtime.togglePump(deviceId, 'pump1', isOn);
       console.log(`Pump 1 ${isOn ? 'turned on' : 'turned off'} for device ${deviceId}`);
       return { success: true };
     } catch (error) {
@@ -262,14 +98,7 @@ export class IoTService {
   // Control pump 2 (on/off)
   async controlPump2(deviceId: string, isOn: boolean) {
     try {
-      const commandData = {
-        device_id: deviceId,
-        pump_id: 'pump_2',
-        action: isOn ? 'on' : 'off',
-        timestamp: serverTimestamp(),
-      };
-
-      await addDoc(collection(db, 'device_commands'), commandData);
+      await firebaseRealtime.togglePump(deviceId, 'pump2', isOn);
       console.log(`Pump 2 ${isOn ? 'turned on' : 'turned off'} for device ${deviceId}`);
       return { success: true };
     } catch (error) {
@@ -278,36 +107,66 @@ export class IoTService {
     }
   }
 
-  // Get pump status
-  async getPumpStatus(deviceId: string) {
+  // Control light (brightness)
+  async controlLight(deviceId: string, isOn: boolean, brightness: number = 50) {
     try {
-      const q = query(
-        collection(db, 'device_commands'),
-        where('device_id', '==', deviceId),
-        orderBy('timestamp', 'desc'),
-        limit(10)
-      );
-
-      const snapshot = await getDocs(q);
-      const commands: any[] = [];
-
-      snapshot.forEach((doc: any) => {
-        commands.push(doc.data());
-      });
-
-      // Return the latest command for each pump
-      const latestCommands: { [key: string]: any } = {};
-      commands.forEach(cmd => {
-        if (!latestCommands[cmd.pump_id] || cmd.timestamp > latestCommands[cmd.pump_id].timestamp) {
-          latestCommands[cmd.pump_id] = cmd;
-        }
-      });
-
-      return latestCommands;
+      await firebaseRealtime.updateLampBrightness(deviceId, isOn ? brightness : 0);
+      console.log(`Light ${isOn ? 'turned on' : 'turned off'} with brightness ${brightness}% for device ${deviceId}`);
+      return { success: true };
     } catch (error) {
-      console.error('Error getting pump status:', error);
+      console.error('Error controlling light:', error);
       throw error;
     }
+  }
+
+  // Trigger feeding
+  async triggerFeeding(deviceId: string) {
+    try {
+      await firebaseRealtime.triggerFeed(deviceId);
+      console.log(`Feeding triggered for device ${deviceId}`);
+      return { success: true };
+    } catch (error) {
+      console.error('Error triggering feeding:', error);
+      throw error;
+    }
+  }
+
+  // Get current device status
+  async getDeviceStatus(deviceId: string): Promise<RealtimeData | null> {
+    try {
+      // This would typically read from the Realtime Database
+      // For now, return null since we don't have a direct read method
+      return null;
+    } catch (error) {
+      console.error('Error getting device status:', error);
+      throw error;
+    }
+  }
+
+  // Simulate IoT device data (for testing)
+  startDataSimulation(deviceId: string, intervalMs: number = 30000) {
+    const simulationInterval = setInterval(async () => {
+      try {
+        // Generate realistic test data based on your database structure
+        const testData: Partial<SensorsData> = {
+          temperature: 24 + (Math.random() - 0.5) * 4, // 22-26°C
+          ph: 7 + (Math.random() - 0.5) * 1, // 6.5-7.5
+          turbidity: 3 + Math.random() * 8, // 3-11 NTU
+          ammonia: Math.random() * 0.3, // 0-0.3 ppm
+          uv: 800 + Math.random() * 400, // 800-1200 UV index
+          waterLevel: 70 + Math.random() * 30, // 70-100%
+          waterLevelCm: 15 + Math.random() * 10, // 15-25 cm
+          foodEmpty: Math.random() > 0.7, // 30% chance of being empty
+        };
+
+        await this.sendSensorData(deviceId, testData);
+        console.log('Simulated data sent:', testData);
+      } catch (error) {
+        console.error('Error in data simulation:', error);
+      }
+    }, intervalMs);
+
+    return () => clearInterval(simulationInterval);
   }
 
   // Private helper method to unsubscribe

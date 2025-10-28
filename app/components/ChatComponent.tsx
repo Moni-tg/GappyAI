@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, FlatList, StyleSheet, Alert, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { generateAIResponse } from './ai_studio_code (1)'; // Adjust path if needed
 
 interface Message {
@@ -8,10 +8,14 @@ interface Message {
   sender: 'user' | 'bot';
 }
 
+const { width } = Dimensions.get('window');
+const MAX_MESSAGE_WIDTH = width * 0.8;
+
 const ChatComponent: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const flatListRef = useRef<FlatList>(null);
 
   // Add initial welcome message
   useEffect(() => {
@@ -22,6 +26,15 @@ const ChatComponent: React.FC = () => {
     };
     setMessages([welcomeMessage]);
   }, []);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    if (messages.length > 1) {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [messages]);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -53,8 +66,15 @@ const ChatComponent: React.FC = () => {
   };
 
   const renderMessage = ({ item }: { item: Message }) => (
-    <View style={[styles.message, item.sender === 'user' ? styles.userMessage : styles.botMessage]}>
-      <Text style={[styles.messageText, item.sender === 'user' ? styles.userMessageText : styles.botMessageText]}>
+    <View style={[
+      styles.message,
+      item.sender === 'user' ? styles.userMessage : styles.botMessage,
+      { maxWidth: MAX_MESSAGE_WIDTH }
+    ]}>
+      <Text style={[
+        styles.messageText,
+        item.sender === 'user' ? styles.userMessageText : styles.botMessageText
+      ]}>
         {item.text}
       </Text>
     </View>
@@ -72,12 +92,17 @@ const ChatComponent: React.FC = () => {
       </View>
 
       <FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={item => item.id}
         renderItem={renderMessage}
         style={styles.messagesList}
         contentContainerStyle={styles.messagesContainer}
         showsVerticalScrollIndicator={false}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10,
+        }}
       />
 
       <View style={styles.inputContainer}>
@@ -90,9 +115,12 @@ const ChatComponent: React.FC = () => {
           editable={!isLoading}
           multiline
           maxLength={500}
+          textAlignVertical="center"
+          returnKeyType="send"
+          onSubmitEditing={sendMessage}
         />
         <TouchableOpacity
-          style={[styles.sendButton, isLoading && styles.sendButtonDisabled]}
+          style={[styles.sendButton, (isLoading || !input.trim()) && styles.sendButtonDisabled]}
           onPress={sendMessage}
           disabled={isLoading || !input.trim()}
         >
@@ -114,64 +142,77 @@ const styles = StyleSheet.create({
   },
   header: {
     backgroundColor: '#007AFF',
-    paddingVertical: 15,
+    paddingVertical: 20,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    marginBottom: 10,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+    marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
   },
   headerSubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     color: '#e6f3ff',
     textAlign: 'center',
-    marginTop: 2,
+    marginTop: 4,
+    fontWeight: '500',
   },
   messagesList: {
     flex: 1,
+    marginHorizontal: 5,
   },
   messagesContainer: {
     padding: 15,
-    paddingBottom: 20,
+    paddingBottom: 25,
+    gap: 8,
   },
   message: {
-    padding: 12,
-    marginVertical: 6,
-    borderRadius: 18,
-    maxWidth: '75%',
-    elevation: 2,
+    padding: 14,
+    marginVertical: 4,
+    borderRadius: 20,
+    maxWidth: MAX_MESSAGE_WIDTH,
+    elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
   },
   userMessage: {
     alignSelf: 'flex-end',
     backgroundColor: '#007AFF',
-    borderBottomRightRadius: 4,
+    borderBottomRightRadius: 6,
+    marginLeft: 60,
   },
   botMessage: {
     alignSelf: 'flex-start',
     backgroundColor: '#fff',
-    borderBottomLeftRadius: 4,
+    borderBottomLeftRadius: 6,
+    marginRight: 60,
     borderWidth: 1,
-    borderColor: '#e0e0e0',
+    borderColor: '#f0f0f0',
   },
   userMessageText: {
     color: '#fff',
     fontSize: 16,
+    lineHeight: 22,
   },
   botMessageText: {
     color: '#333',
     fontSize: 16,
+    lineHeight: 22,
   },
   messageText: {
     fontSize: 16,
+    lineHeight: 22,
   },
   inputContainer: {
     flexDirection: 'row',
@@ -180,31 +221,45 @@ const styles = StyleSheet.create({
     paddingBottom: Platform.OS === 'ios' ? 35 : 15,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#e8e8e8',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
+    gap: 12,
   },
   input: {
     flex: 1,
     borderWidth: 1,
-    borderColor: '#ddd',
+    borderColor: '#e0e0e0',
     borderRadius: 25,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
-    marginRight: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     backgroundColor: '#f8f9fa',
     fontSize: 16,
-    maxHeight: 100,
+    maxHeight: 120,
+    minHeight: 50,
+    textAlignVertical: 'center',
   },
   sendButton: {
     backgroundColor: '#007AFF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
     borderRadius: 25,
-    minWidth: 70,
+    minWidth: 75,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#007AFF',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 3,
   },
   sendButtonDisabled: {
     backgroundColor: '#ccc',
+    shadowOpacity: 0,
+    elevation: 0,
   },
   sendButtonText: {
     color: '#fff',
